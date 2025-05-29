@@ -4,13 +4,13 @@
 #include <sstream>
 #include <iostream>
 
-static size_t parse_to_string(void* ptr, size_t size, size_t nmenb, void* userdata) {
+static size_t parsingListing(void* ptr, size_t size, size_t nmenb, void* userdata) {
 	std::string* s = static_cast<std::string*>(userdata);
 	s->append(static_cast<char*>(ptr), size * nmenb);
 	return size * nmenb;
 }
 
-static size_t write_to_file(void* ptr, size_t size, size_t nmemb, void* userdata) {
+static size_t downloadingFile(void* ptr, size_t size, size_t nmemb, void* userdata) {
 	std::ofstream* file = static_cast<std::ofstream*>(userdata);
 	file->write(static_cast<char*>(ptr), size * nmemb);
 	return size * nmemb;
@@ -76,7 +76,7 @@ std::vector<std::string> FTPModel::list() {
 
 	std::string data;
 	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_DIRLISTONLY, 1L);
-	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_WRITEFUNCTION, parse_to_string);
+	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_WRITEFUNCTION, parsingListing);
 	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_WRITEDATA, &data);
 
 	CURLcode res = curl_easy_perform(static_cast<CURL*>(curl));
@@ -87,6 +87,7 @@ std::vector<std::string> FTPModel::list() {
 			if (!line.empty()) entries.push_back(line);
 		}
 	}
+
 	return entries;
 }
 
@@ -98,12 +99,16 @@ bool FTPModel::cd(const std::string& path) {
 	std::string base = effectiveUrl ? effectiveUrl : "";
 
 	auto pos = base.find('/', 7); 
-	base = base.substr(0, pos) + "/" + path + "/";
-	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_URL, base.c_str());
+	std::string newUrl = base.substr(0, pos) + "/" + path + "/";
+	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_URL, newUrl.c_str());
 
 	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_NOBODY, 1L);
 	CURLcode res = curl_easy_perform(static_cast<CURL*>(curl));
 	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_NOBODY, 0L);
+
+	if (res != CURLE_OK) {
+		curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_URL, base.c_str());
+	}
 
 	return (res == CURLE_OK);
 }
@@ -117,16 +122,24 @@ bool FTPModel::download(const std::string& remoteFile, const std::string localFi
 	char* eff_url = nullptr;
 	curl_easy_getinfo(static_cast<CURL*>(curl), CURLINFO_EFFECTIVE_URL, &eff_url);
 
-	std::string remoteFileUrl = eff_url ? eff_url : "" + remoteFile;
+	std::string base = eff_url ? eff_url : "";
 
-	std::cout << "Downloading from: " << eff_url << remoteFile << "\n"
+	if (!base.empty() && base.back() != '/' ) base.push_back('/');
+
+	std::string remoteFileUrl = base + remoteFile;
+
+	std::cout << "Downloading from: " << remoteFileUrl << "\n"
 		<< "Saving to:      " << localFile << "\n";
 
+	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_DIRLISTONLY, 0L);
 	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_URL, remoteFileUrl.c_str());
-	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_WRITEFUNCTION, write_to_file);
+	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_WRITEFUNCTION, downloadingFile);
 	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_WRITEDATA, &ofs);
 
 	CURLcode res = curl_easy_perform(static_cast<CURL*>(curl));
+
+	curl_easy_setopt(static_cast<CURL*>(curl), CURLOPT_URL, base.c_str());
+
 	return (res == CURLE_OK);
 }
 
