@@ -30,6 +30,8 @@ void FTPController::run() {
         view.showMenu();
         std::string choice = view.prompt("");
 
+        // tinhtx: using a switch-case statement for better readability
+        // each case create a new function to handle the specific action
         if (choice == "1") {
             auto list = model.list();
             view.showList(list);

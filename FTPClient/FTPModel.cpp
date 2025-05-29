@@ -55,6 +55,7 @@ std::string FTPModel::getCurrentDirectory() {
 	return current;
 }
 
+//tinhtx: need return message to indicate success or failure
 bool FTPModel::connect(const std::string& server, const std::string& user, const std::string& pwd) {
 	if (!curl) return false;
 
@@ -106,7 +107,7 @@ bool FTPModel::cd(const std::string& path) {
 
 	return (res == CURLE_OK);
 }
-
+//tinhtx: need return message to indicate success or failure
 bool FTPModel::download(const std::string& remoteFile, const std::string localFile) {
 	if (!curl) return false;
 
